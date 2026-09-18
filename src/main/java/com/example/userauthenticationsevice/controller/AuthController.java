@@ -1,15 +1,15 @@
 package com.example.userauthenticationsevice.controller;
 
-import com.example.userauthenticationsevice.dtos.LogOutRequestDto;
-import com.example.userauthenticationsevice.dtos.LoginRequestDto;
-import com.example.userauthenticationsevice.dtos.SignUpRequestDto;
-import com.example.userauthenticationsevice.dtos.UserDto;
+import com.example.userauthenticationsevice.dtos.*;
+import com.example.userauthenticationsevice.exception.InvalidCredentialsException;
 import com.example.userauthenticationsevice.exception.UserAlreadyExistsException;
 import com.example.userauthenticationsevice.models.User;
 import com.example.userauthenticationsevice.services.IAuthService;
+import org.antlr.v4.runtime.misc.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -32,15 +32,27 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<UserDto> login(@RequestBody LoginRequestDto loginRequestDto) {
-        User user =  authService.login(loginRequestDto.getEmail(), loginRequestDto.getPassword());
-        return new ResponseEntity<>(from(user), HttpStatus.OK);
+    public ResponseEntity<UserDto> login(@RequestBody LoginRequestDto loginRequestDto) throws InvalidCredentialsException {
+        Pair<User, MultiValueMap<String, String>> p =  authService.login(loginRequestDto.getEmail(), loginRequestDto.getPassword());
+        if(p.a == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+        return new ResponseEntity<>(from(p.a),p.b, HttpStatus.OK);
     }
 
-    @PostMapping("logout")
+    @PostMapping("/logout")
     public ResponseEntity<UserDto> logout(@RequestBody LogOutRequestDto  logOutRequestDto) {
         User user =  authService.logout(logOutRequestDto.getEmail());
         return new ResponseEntity<>(from(user), HttpStatus.OK);
+    }
+
+    @PostMapping("/validateToken")
+    public Boolean validate(@RequestBody ValidateTokenDto validateTokenDto) throws InvalidCredentialsException {
+        Boolean result = authService.validateToken(validateTokenDto);
+        if(!result){
+            throw new InvalidCredentialsException("Token is expired");
+        }
+        return true;
     }
 
     private UserDto from(User user){
