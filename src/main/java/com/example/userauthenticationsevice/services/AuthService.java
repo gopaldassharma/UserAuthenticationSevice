@@ -1,5 +1,7 @@
 package com.example.userauthenticationsevice.services;
 
+import com.example.userauthenticationsevice.clients.KafkaClient;
+import com.example.userauthenticationsevice.dtos.EmailDto;
 import com.example.userauthenticationsevice.dtos.ValidateTokenDto;
 import com.example.userauthenticationsevice.exception.InvalidCredentialsException;
 import com.example.userauthenticationsevice.exception.UserAlreadyExistsException;
@@ -8,6 +10,8 @@ import com.example.userauthenticationsevice.models.State;
 import com.example.userauthenticationsevice.models.User;
 import com.example.userauthenticationsevice.repos.SessionRepo;
 import com.example.userauthenticationsevice.repos.UserRepo;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
@@ -38,6 +42,12 @@ public class AuthService implements IAuthService{
     @Autowired
     private SecretKey secretKey;
 
+    @Autowired
+    private KafkaClient kafkaClient;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
     @Override
     public User signUp(String email, String password) throws UserAlreadyExistsException {
         Optional<User> userOptional = userRepo.findUserByEmail(email);
@@ -48,6 +58,21 @@ public class AuthService implements IAuthService{
         user.setEmail(email);
         user.setPassword(bCryptPasswordEncoder.encode(password));
         userRepo.save(user);
+
+        //use Kafka
+        try{
+            String topic = "signup";
+            EmailDto emailDto = new EmailDto();
+            emailDto.setFrom("gopaldassharma09@gmail.com");
+            emailDto.setTo(email);
+            emailDto.setSubject("Welcome To Scaler");
+            emailDto.setBody("Welcome to the Scaler NeoVersity");
+            String message = objectMapper.writeValueAsString(emailDto);
+            kafkaClient.sendMessage(topic, message);
+        }
+        catch(JsonProcessingException e){
+            throw new RuntimeException(e);
+        }
         return user;
     }
 
